@@ -7,38 +7,33 @@ function hasRole(role) {
     const authorization = req.headers.authorization;
 
     if (!authorization) {
-      return res.status(401).json({ message: "Token inválido." });
+      return res.status(400).json({ message: "Token inválido." });
     }
 
     const [authType, token] = authorization.split(" ");
 
     try {
       const secret = process.env.JWT_SECRET;
-      jwt.verify(token, secret, async (err, decoded) => {
-        if (err) {
-          return res.status(403).json({ message: "Acesso negado." });
-        }
 
-        const user = await User.findOne({ where: { id: decoded.id } });
+      const decoded = jwt.verify(token, secret);
+      const user = await User.findOne({ where: { id: decoded.id } });
 
-        if (!user) {
-          return res.status(403).json({ message: "E-mail não cadastrado." });
-        }
+      if (!user) {
+        return res.status(401).json({ message: "Acesso negado." });
+      }
 
-        if (role === "*") {
-          next();
-          return;
-        }
+      const allRolesAllowed = role === "*"; // todos os papéis permitidos
+      const hasCorrectRole =
+        decoded.role === user.role && decoded.role === role; // papel específico permitido
 
-        if (decoded.role === user.role && decoded.role === role) {
-          next();
-          return;
-        }
+      if (allRolesAllowed || hasCorrectRole) {
+        next(); // Só avança se todos os papéis forem permitidos ou o usuário está acessando com papel correto
+        return;
+      }
 
-        return res.status(403).json({ message: "Acesso negado." });
-      });
+      return res.status(403).json({ message: "Sem autorização necessária." });
     } catch (err) {
-      return res.status(500).json({ message: "Algo deu errado." });
+      return res.status(403).json({ message: "Acesso negado." });
     }
   };
 }
